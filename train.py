@@ -23,7 +23,7 @@ def train(cache, batch_size, img_size, epochs, model_path, model_name, debug):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    with open("/content/drive/MyDrive/Breast_Density_Kaggle_Sample_Data/data_dict_u.json") as f:
+    with open("./data_dict.json") as f:
         data = json.load(f)
 
     train_data = data["Train"]
