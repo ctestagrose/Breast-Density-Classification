@@ -1,5 +1,6 @@
 from model_def import ModelDefinition
 import train
+import predict
 
 cache = 1
 debug = 0
@@ -17,3 +18,4 @@ if os.path.isdir(model_path) == False:
 # model_name = "InceptionV3"
 model_name = 'ViT_Pretrained'
 train(cache, batch_size, img_size, epochs, model_path, model_name, debug)
+predict(model_name, model_path, num_class)
