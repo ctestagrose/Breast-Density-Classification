@@ -18,12 +18,15 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 from monai.data import CacheDataset, DataLoader, Dataset
 from model_def import ModelDefinition
+from DataLoader import dataloader, val_dataloader
 
-def train(cache, batch_size, img_size, epochs, model_path, model_name, debug):
+def train(num_class, pretrained, cache, data_dictionary, batch_size, img_size, epochs, model_path, model_name, debug):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    with open("./data_dict.json") as f:
+    print("Using data dictionary found at: "+data_dictionary)
+
+    with open(data_dictionary, "r") as f:
         data = json.load(f)
 
     train_data = data["Train"]
@@ -76,21 +79,24 @@ def train(cache, batch_size, img_size, epochs, model_path, model_name, debug):
 
 
     if int(cache) == 1:
-        train_ds = CacheDataset(
-            data=train_data,
-            transform=MONAI_train_transforms,
-            cache_rate=1,
-            num_workers=16
-        )
-        train_loader = DataLoader(train_ds, batch_size=int(batch_size), num_workers=8)
-        validation_ds = CacheDataset(
-            data=validation_data,
-            transform=MONAI_validation_transforms,
-            cache_rate=1,
-            num_workers=16
-        )
-        validation_loader = DataLoader(validation_ds, batch_size=int(batch_size), num_workers=8)
-
+        print("Caching Dataset...\n")
+        try:
+            train_ds = CacheDataset(
+                data=train_data,
+                transform=MONAI_train_transforms,
+                cache_rate=1,
+                num_workers=16
+            )
+            train_loader = DataLoader(train_ds, batch_size=int(batch_size), num_workers=8)
+            validation_ds = CacheDataset(
+                data=validation_data,
+                transform=MONAI_validation_transforms,
+                cache_rate=1,
+                num_workers=16
+            )
+            validation_loader = DataLoader(validation_ds, batch_size=int(batch_size), num_workers=8)
+        except:
+            print("Caching failed... please adjust your parameters or ensure you have enough system memory.")
     else:
         train_ds = dataloader(train_data, transforms=pytorch_Train)
         validation_ds = val_dataloader(validation_data, transforms=pytorch_Validate)
@@ -104,8 +110,7 @@ def train(cache, batch_size, img_size, epochs, model_path, model_name, debug):
     val_interval = 1
     # writer = SummaryWriter()
 
-    mod = ModelDefinition(num_class, pretrained_flag=pretrained, dropout_ratio=dropout_ratio, fc_nodes=fc_nodes,
-                          patch_size=patch_size, img_size=img_size)
+    mod = ModelDefinition(num_class, pretrained_flag=pretrained, img_size=img_size)
 
     if model_name == 'InceptionV3':
         model = mod.inception_v3()
@@ -122,6 +127,7 @@ def train(cache, batch_size, img_size, epochs, model_path, model_name, debug):
 
     model.to(device)
 
+    print("Starting to Train")
     for epoch in range(epochs):
         print("-" * 10)
         model.train()
@@ -171,7 +177,7 @@ def train(cache, batch_size, img_size, epochs, model_path, model_name, debug):
                     print('Saved new model')
                 print("Current Epoch: {} current accuracy: {:.4f}"
                       " Best accuracy: {:.4f} at epoch {}".format(epoch + 1, metric, best_metric, best_metric_epoch))
-                print("val_accuracy", metric, epoch + 1)
+                print("validation_accuracy: " + str(metric) + " Epoch Number: " +str(epoch + 1))
     print(f"training completed, best_metric: {best_metric: .4f}"
                   f" at epoch: {best_metric_epoch}")
         # writer.close()
