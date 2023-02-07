@@ -3,7 +3,7 @@ from pytorch_pretrained_vit import ViT
 import torch.nn as nn
 
 class ModelDefinition():
-    def __init__(self, num_class: int, pretrained_flag=True, dropout_ratio=float, fc_nodes=int, patch_size=int, img_size=int):
+    def __init__(self, num_class: int, pretrained_flag=True, dropout_ratio=0.5, fc_nodes=1024, patch_size=32, img_size=int):
         self.num_class = num_class
         self.pretrain_flag = pretrained_flag
         self.dropout_ratio = dropout_ratio
@@ -14,10 +14,10 @@ class ModelDefinition():
     def inception_v3(self, device='cpu'):
         model = models.inception_v3(pretrained=self.pretrain_flag)
         model.fc = nn.Sequential(
-            nn.Linear(model.fc.in_features, self.fc_nodes),
+            nn.Linear(model.fc.in_features, 1024),
             nn.ReLU(),
-            nn.Dropout(self.dropout_ratio),
-            nn.Linear(self.fc_nodes, self.num_class))
+            nn.Dropout(0.5),
+            nn.Linear(1024, self.num_class))
         model.aux_logits = False
         model.to(device)
         return model
