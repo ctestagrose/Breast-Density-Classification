@@ -31,24 +31,9 @@ import torch
 import torchvision
 import progressbar
 from Crop_Image import CropImage, CropImaged
+from DataLoader import dataloader, val_dataloader
 
-
-class dataloader(Dataset):
-    def __init__(self, dict, transforms):
-        self.dict = dict
-        self.transforms = transforms
-
-    def __len__(self):
-        return len(self.dict)
-
-    def __getitem__(self, index):
-        image = cv2.imread(self.dict[index]['image'])
-        image = self.transforms(image)
-        label = self.dict[index]['label']
-        label = torch.FloatTensor(label)
-        return image, label
-
-def returnCAM(model_path, model_name):
+def returnCAM(model_path, model_name, img_size, num_classes, model):
     print_config()
     print_gpu_info()
 
@@ -87,8 +72,6 @@ def returnCAM(model_path, model_name):
 
     model_filename = model_path + '/best_model.pth'
 
-    num_classes = int(sys.argv[3])
-
     # place list of classes here in the format of 'Class Identifier':[], 'Class Identifier':[]"
     class_list = {}
 
@@ -101,14 +84,6 @@ def returnCAM(model_path, model_name):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    if model_name == "InceptionV3":
-        model_def = mod.inception_v3()
-        model = model_def.get_model()
-        #model = nn.DataParallel(model)
-    if model_name == 'ViT':
-        model_def = mod.ViT_Pretrained()
-        model = model_def.get_model_ViT()
-        #model = nn.DataParallel(model)
     model.to(device)
     model.load_state_dict(torch.load(model_filename))
     model.eval()
@@ -191,16 +166,14 @@ def generate_ROC(y_test, y_score, Y_PRED_NP, num_classes, GT_LIST, model_name, m
     print('Area under the ROC curve is, ', roc_auc)
     plt.clf()
 
-def generate_confusion_matrix(y_true, y_predicted, class_list, model_name):
+def generate_confusion_matrix(y_true, y_predicted, class_list, model_name, model_path):
     cf_matrix = confusion_matrix(y_true, y_predicted)
     df_cm = pd.DataFrame(cf_matrix, index=[i for i in class_list], columns=[i for i in class_list])
     df_cm.to_csv(model_path + '/confusion_matrix_' + model_name + '.csv')
     num_correct = df_cm.iloc[0, 0] + df_cm.iloc[1, 1] + df_cm.iloc[2, 2] + df_cm.iloc[3, 3]
     return num_correct
 
-def predict(model_name, model_path, num_class):
-    print_config()
-    print_gpu_info()
+def predict(model_name, model_path, num_classes, data_dictionary, img_size):
 
     test_transforms = Compose(
         [LoadImaged(keys=['image']),
@@ -212,11 +185,11 @@ def predict(model_name, model_path, num_class):
     pytorch_Test = torchvision.transforms.Compose([
         torchvision.transforms.ToPILImage(),
         CropImage(),
-        torchvision.transforms.Resize((32, 32)),
+        torchvision.transforms.Resize((int(img_size), int(img_size))),
         torchvision.transforms.ToTensor()]
     )
 
-    with open("/content/drive/MyDrive/Breast_Density_Kaggle_Sample_Data/data_dict_u.json") as f:
+    with open(data_dictionary, "r") as f:
         data = json.load(f)
 
     test_list = data['Test']
@@ -237,13 +210,13 @@ def predict(model_name, model_path, num_class):
             num_workers=16
         )
 
-    model_filename = model_path + '/best_model_vit.pth'
-
-    num_classes = int(num_class)
+    if model_name == "ViT_Pretrained":
+        model_filename = model_path + '/best_model_vit.pth'
+    else:
+        model_filename = model_path + '/best_model.pth'
 
     #place list of classes here in the format of 'Class Identifier':[], 'Class Identifier':[]"
-    class_list = {}
-
+    class_list = {"A": [], "B": [], "C": [], "D": []}
     count = 0
     for _class in class_list:
         label_list = [0] * num_classes
@@ -255,16 +228,15 @@ def predict(model_name, model_path, num_class):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-
+    mod = ModelDefinition(num_classes, pretrained_flag=False, img_size=img_size)
 
     if model_name == "InceptionV3":
-        model_def = mod.inception_v3()
-        model = model_def.get_model()
+        model = mod.inception_v3()
         #model = nn.DataParallel(model)
     if model_name == 'ViT_Pretrained':
-        model_def = mod.ViT_Pretrained()
-        model = model_def.get_model_ViT()
+        model = mod.ViT_Pretrained()
         #model = nn.DataParallel(model)
+
     model.to(device)
     model.load_state_dict(torch.load(model_filename))
     model.eval()
@@ -280,7 +252,7 @@ def predict(model_name, model_path, num_class):
     y_score = []
     GT_LIST = []
 
-    pb = progressbar.ProgressBar(max_value=len(test_list))
+    pb = progressbar.ProgressBar(maxval=len(test_list))
 
     if pytorch_transforms == 'Yes':
         test_ds = dataloader(test_list, transforms=pytorch_Test)
@@ -289,10 +261,11 @@ def predict(model_name, model_path, num_class):
         test_loader = DataLoader(test_ds, num_workers=0)
 
     #labels should be in the format of ['Class', 'Class', 'Class'....]
-    labels = []
+    labels = ["A", "B", "C", "D"]
     #valies should be in the format of ['0', '1'...]
-    values = []
+    values = ["0", "1", "2", "3"]
 
+    pb.start()
     if pytorch_transforms == 'Yes':
         for image in test_list:
             Image_FN_LIST.append(image['image'])
@@ -331,7 +304,7 @@ def predict(model_name, model_path, num_class):
 
     generate_ROC(y_test, y_score, Y_PRED_NP, num_classes, GT_LIST, model_name, model_path)
 
-    num_correct = generate_confusion_matrix(y_true, y_predicted, class_list, model_name)
+    generate_confusion_matrix(y_true, y_predicted, class_list, model_name, model_path)
 
     df = pd.DataFrame(Y_PRED_NP, columns=class_list)
     df.insert(0, 'GT', GT_LIST)
@@ -340,6 +313,9 @@ def predict(model_name, model_path, num_class):
 
     kappa = metrics.cohen_kappa_score(y_true, y_predicted)
     print(kappa)
+
+    with open(model_path+ '/classification_report_' + model_name + '.txt', 'w') as f:
+        f.write(classification_report(y_true, y_predicted))
 
     with open(model_path+ '/classification_report_' + model_name + '.txt', 'w') as f:
         f.write(classification_report(y_true, y_predicted))
