@@ -8,6 +8,16 @@ Before Running Code:
   2. Place the jpeg folder found in the downloaded files into the project folder
   3. Install the required packages found in requirements.txt
 
-Install the dependencies listed in environment.yml to a new environment. 
-
-Use run.py to make changes to the pipeline and run the code. 
+Training Classifier:
+  1. Make adjustments to the hyperparameters found in the run.py
+  2. After adjusting the hyperparameters and file paths to your liking, run the following command in terminal
+  ```
+  python run.py
+  ```
+  
+ Evaluating Classifier
+  1. This code is set up to automatically begin evaluation after training for the specified number of epochs.      To adjust this, simply comment out the following line in run.py
+  ```
+  train.train(num_class, pretrained, cache, data_dictionary, batch_size, img_size, epochs, model_path, model_name, debug)
+  ```
+  2. Upon completion of the code, the results will be saved to the path specified in run.py
