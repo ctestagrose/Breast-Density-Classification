@@ -16,6 +16,8 @@ if __name__ == "__main__":
     epochs = 100
     model_path = "./Models/Sample_Model"
     data_dictionary = "./data_dictionaries/data_dict.json"
+    if os.path.isdir("./Models") == False:
+        os.makedirs("./Models")
     if os.path.isdir(model_path) == False:
         os.makedirs("./Models/Sample_Model")
     # model_name = "InceptionV3"
